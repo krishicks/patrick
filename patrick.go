@@ -14,9 +14,19 @@ type Opts struct {
 	PreserveParamNames bool
 }
 
+func PreserveParamNames(opts *Opts) {
+	opts.PreserveParamNames = true
+}
+
 // Pour takes bytes of a Go source file, an interface in the source, and
 // options for how to pour the struct
-func Pour(src []byte, interfaceName string, structName string, opts Opts) (*ast.GenDecl, []*ast.FuncDecl, error) {
+func Pour(src []byte, interfaceName string, structName string, optFuns ...func(*Opts)) (*ast.GenDecl, []*ast.FuncDecl, error) {
+
+	opts := &Opts{}
+	for _, fun := range optFuns {
+		fun(opts)
+	}
+
 	if interfaceName == "" {
 		return nil, nil, errors.New("must provide interface varName")
 	}

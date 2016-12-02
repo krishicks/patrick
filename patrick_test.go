@@ -13,7 +13,7 @@ var _ = Describe("Patrick", func() {
 	Describe("Pour", func() {
 		var (
 			src  []byte
-			opts patrick.Opts
+			opts []func(*patrick.Opts)
 
 			actualGenDecl   *ast.GenDecl
 			actualFuncDecls []*ast.FuncDecl
@@ -29,11 +29,12 @@ type MyInterface interface {
 	B()
 }
 `)
-			opts = patrick.Opts{}
+
+			opts = []func(*patrick.Opts){}
 		})
 
 		JustBeforeEach(func() {
-			actualGenDecl, actualFuncDecls, pourErr = patrick.Pour(src, "MyInterface", "myStruct", opts)
+			actualGenDecl, actualFuncDecls, pourErr = patrick.Pour(src, "MyInterface", "myStruct", opts...)
 			Expect(pourErr).NotTo(HaveOccurred())
 		})
 
@@ -372,9 +373,33 @@ type MyInterface interface {
 `)
 			})
 
+			It("returns a FuncDecl with generic param names", func() {
+				// func(m *myStruct) A(someInt int, someString string) {}
+
+				Expect(actualFuncDecls).To(HaveLen(1))
+
+				funcDecl := actualFuncDecls[0]
+				Expect(funcDecl.Name).To(Equal(&ast.Ident{Name: "A"}))
+
+				fields := funcDecl.Type.Params.List
+				Expect(fields).To(HaveLen(2))
+
+				Expect(fields[0].Names).To(HaveLen(1))
+				Expect(fields[0].Names[0]).To(Equal(ast.NewIdent("arg1")))
+				fieldType, ok := fields[0].Type.(*ast.Ident)
+				Expect(ok).To(BeTrue())
+				Expect(fieldType.Name).To(Equal("int"))
+
+				Expect(fields[1].Names).To(HaveLen(1))
+				Expect(fields[1].Names[0]).To(Equal(ast.NewIdent("arg2")))
+				fieldType, ok = fields[1].Type.(*ast.Ident)
+				Expect(ok).To(BeTrue())
+				Expect(fieldType.Name).To(Equal("string"))
+			})
+
 			Context("when preserveParamNames is true", func() {
 				BeforeEach(func() {
-					opts.PreserveParamNames = true
+					opts = append(opts, patrick.PreserveParamNames)
 				})
 
 				It("returns a FuncDecl with preserved param names", func() {
@@ -396,37 +421,6 @@ type MyInterface interface {
 
 					Expect(fields[1].Names).To(HaveLen(1))
 					Expect(fields[1].Names[0]).To(Equal(ast.NewIdent("someString")))
-					fieldType, ok = fields[1].Type.(*ast.Ident)
-					Expect(ok).To(BeTrue())
-					Expect(fieldType.Name).To(Equal("string"))
-
-				})
-			})
-
-			Context("when preserveParamNames is false", func() {
-				BeforeEach(func() {
-					opts.PreserveParamNames = false
-				})
-
-				It("returns a FuncDecl with generic param names", func() {
-					// func(m *myStruct) A(someInt int, someString string) {}
-
-					Expect(actualFuncDecls).To(HaveLen(1))
-
-					funcDecl := actualFuncDecls[0]
-					Expect(funcDecl.Name).To(Equal(&ast.Ident{Name: "A"}))
-
-					fields := funcDecl.Type.Params.List
-					Expect(fields).To(HaveLen(2))
-
-					Expect(fields[0].Names).To(HaveLen(1))
-					Expect(fields[0].Names[0]).To(Equal(ast.NewIdent("arg1")))
-					fieldType, ok := fields[0].Type.(*ast.Ident)
-					Expect(ok).To(BeTrue())
-					Expect(fieldType.Name).To(Equal("int"))
-
-					Expect(fields[1].Names).To(HaveLen(1))
-					Expect(fields[1].Names[0]).To(Equal(ast.NewIdent("arg2")))
 					fieldType, ok = fields[1].Type.(*ast.Ident)
 					Expect(ok).To(BeTrue())
 					Expect(fieldType.Name).To(Equal("string"))
